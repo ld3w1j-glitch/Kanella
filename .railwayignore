@@ -1,0 +1,14 @@
+.venv/
+instance/
+__pycache__/
+.pytest_cache/
+test-results/
+tests/
+brand/
+scripts/
+*.pyc
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.db

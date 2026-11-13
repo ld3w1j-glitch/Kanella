@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Kanella Barber Shop. Escolha seu horário, reserve seu corte e faça parte do nosso clube de benefícios.">
+  <meta name="theme-color" content="#101210"><title>Kanella Barber Shop · Agende seu momento</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='brand.css') }}?v=6">
+  <link rel="preload" as="image" href="{{ url_for('static', filename='brand/kanella-master.png') }}">
+  <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Ir para o conteúdo</a>
+  <div class="topline"><span>SEU ESTILO. NOSSA MISSÃO.</span><span>Atendimento com hora marcada <b>✦</b></span></div>
+  <header class="header shell">
+    <a class="brand" href="#booking" aria-label="Kanella Barber Shop, início"><span class="brand-wordmark" aria-hidden="true"><img src="{{ url_for('static', filename='brand/kanella-master.png') }}" alt="" width="1536" height="1024"></span></a>
+    <nav class="nav" id="navigation" aria-label="Navegação principal"><a href="#booking" data-nav="booking">Agendar horário</a><a href="#store" data-nav="store">Nossa loja <span class="tiny-label">CLUBE</span></a><a href="#club" data-nav="club">Clube Kanella</a><a href="#admin" data-nav="admin" id="admin-nav">Gerenciador</a></nav>
+    <a class="account-button" href="#club"><svg class="icon"><use href="/static/icons.svg#user"/></svg><span id="account-label">Minha conta</span></a>
+    <button class="icon-button mobile-menu" id="menu-button" aria-label="Abrir menu" aria-controls="navigation" aria-expanded="false"><svg class="icon"><use href="/static/icons.svg#menu"/></svg></button>
+  </header>
+  <main class="shell" id="main" tabindex="-1"><div class="loading-page" role="status">Preparando sua experiência Kanella…</div></main>
+  <footer class="shell footer"><a class="brand" href="#booking" aria-label="Kanella Barber Shop, início"><span class="brand-wordmark" aria-hidden="true"><img src="{{ url_for('static', filename='brand/kanella-master.png') }}" alt="" width="1536" height="1024"></span></a><p>Respeito. Estilo. Confiança. Atitude.</p><a href="#admin">Área administrativa ↗</a></footer>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <noscript><p>Ative o JavaScript para consultar a agenda e solicitar seu horário.</p></noscript>
+</body></html>

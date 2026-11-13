@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!requirements.txt
+!app.py
+!domain.py
+!migrations.py
+!pix.py
+!run.py
+!schema.sql
+!templates/
+!templates/**
+!static/
+!static/**
