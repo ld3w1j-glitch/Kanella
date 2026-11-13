@@ -34,3 +34,18 @@ document.addEventListener('submit',async event=>{
 async function init(){try{await reload();state.date=state.boot.today;const token=new URLSearchParams(location.search).get('reserva');if(token){state.booking=(await api(`/api/bookings?token=${encodeURIComponent(token)}`)).booking;state.step=3;}await go(location.hash.slice(1)||'booking');}catch(e){state.error=e.message;render();}}
 void init();
 setInterval(async()=>{if(state.boot&&state.view==='booking'&&state.step===0&&!state.busy){try{await loadSlots(ctx);render();}catch{/* Preserve the current selection; the server validates at checkout. */}}},30000);
+let adminPollPending=false;
+setInterval(async()=>{
+ if(adminPollPending||document.hidden||!state.boot?.isAdmin||state.view!=='admin'||state.adminSection!=='dashboard'||!state.admin||state.busy)return;
+ const snapshot=state.admin,filter=state.filter;
+ adminPollPending=true;
+ try{
+  const response=await fetch('/api/admin',{cache:'no-store'});
+  if(!response.ok)return;
+  const updated=await response.json();
+  // Ignore responses superseded by navigation, another refresh, or a user action.
+  if(document.hidden||state.view!=='admin'||state.adminSection!=='dashboard'||state.busy||state.admin!==snapshot||state.filter!==filter)return;
+  if(JSON.stringify(updated)!==JSON.stringify(snapshot)){state.admin=updated;render();}
+ }catch{/* Keep the last dashboard until the next successful refresh. */}
+ finally{adminPollPending=false;}
+},15000);

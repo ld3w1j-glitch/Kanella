@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 CREATE INDEX IF NOT EXISTS bookings_user ON bookings(user_id);
 CREATE TABLE IF NOT EXISTS booking_slots (date TEXT NOT NULL,time TEXT NOT NULL,booking_id TEXT NOT NULL REFERENCES bookings(id),PRIMARY KEY(date,time));
+CREATE TABLE IF NOT EXISTS booking_cancellation_notifications (
+ booking_id TEXT PRIMARY KEY REFERENCES bookings(id), status TEXT NOT NULL CHECK(status IN ('pending','accepted','failed','unconfigured'))
+);
 CREATE TABLE IF NOT EXISTS orders (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), items TEXT NOT NULL, subtotal INTEGER NOT NULL,
  discount INTEGER NOT NULL, total INTEGER NOT NULL, points_spent INTEGER NOT NULL DEFAULT 0,

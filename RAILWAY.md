@@ -36,6 +36,8 @@ O volume começa vazio: a primeira inicialização cria um banco novo com catál
 
 No painel, ajuste preços, serviços, estoque e WhatsApp. Para usar Pix, configure e ative a chave, o recebedor e a cidade e confira no banco antes de receber de clientes. O QR estático não confirma pagamentos automaticamente. A entrega de WhatsApp automático também depende de configuração externa e não está ativa por esta preparação.
 
+Para aviso automático ao barbeiro quando uma reserva confirmada for cancelada, configure `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` e `WHATSAPP_CANCELLATION_TEMPLATE_NAME`, além do número de destino em **Administração → WhatsApp**. O template de cancelamento precisa ser aprovado pela Meta em `pt_BR` com uma variável de texto no corpo, adequada ao aviso; não reutilize o template de confirmação do cliente. O cancelamento é persistido antes do envio, e a aceitação pelo provedor não confirma entrega. Falhas são registradas e não há reenvio automático. Cancelamentos ainda pendentes não geram aviso. A integração deve ser configurada e validada na conta Meta; não fica ativa apenas com o deploy. Como Pix estático não confirma pagamento, o cliente que tiver pago deve contatar a barbearia sobre o pagamento.
+
 ## Referências
 
 Documentação oficial consultada em 13/11/2026: [Dockerfiles](https://docs.railway.com/builds/dockerfiles), [volumes](https://docs.railway.com/volumes), [healthchecks](https://docs.railway.com/deployments/healthchecks), [variáveis](https://docs.railway.com/variables), [SSH](https://docs.railway.com/cli/ssh) e [redirecionamento e cabeçalhos](https://docs.railway.com/networking/public-networking/specs-and-limits).

@@ -66,6 +66,8 @@ Valores e estoque são exemplos: ajuste no painel antes de abrir a agenda aos cl
 
 O código só chama a API quando as três configurações obrigatórias existem. Se a API falhar, a aprovação permanece e o painel oferece o envio manual. `accepted` significa aceitação pelo provedor, **não entrega ou leitura**; não há webhook de confirmação de entrega nesta versão. Nenhuma mensagem real foi enviada durante os testes. Valide o template e a integração com a sua conta antes de depender do envio automático.
 
+Para avisar o barbeiro quando um cliente cancelar um agendamento confirmado, configure também `WHATSAPP_CANCELLATION_TEMPLATE_NAME` com um template Meta aprovado em `pt_BR` que tenha uma variável de texto no corpo e cujo conteúdo seja adequado ao aviso de cancelamento. Defina o número de destino em **Administração → WhatsApp**; ele precisa estar apto a receber mensagens da conta comercial. É necessário configurar `WHATSAPP_ACCESS_TOKEN` e `WHATSAPP_PHONE_NUMBER_ID` acima. Cancelamentos pendentes não enviam aviso. O cancelamento é salvo antes da tentativa de envio; falhas não revertem o cancelamento. O painel distingue aviso não configurado, em processamento, aceito pelo provedor e falha. A aceitação não confirma entrega e não há reenvio automático. Em caso de Pix pago fora do sistema, o cliente deve contatar a barbearia sobre o pagamento.
+
 Contato para o cliente falar com a barbearia: salve o número em **Administração → WhatsApp**. Esse contato público não configura a API de envio.
 
 ## Estrutura
@@ -101,9 +103,9 @@ Senhas usam o hash seguro do Werkzeug; sessão com cookie HttpOnly/SameSite, CSR
 
 Faça backup do SQLite com a API de backup do SQLite, ou com o servidor parado. Preserve `instance/.secret-key`; é a chave das sessões, não deve ir para Git nem para compartilhamento público. Se usar sincronização de pastas, evite executar o mesmo banco simultaneamente em computadores diferentes.
 
-A aplicação **não foi publicada na internet**. Os arquivos para implantação no Railway e os passos de configuração estão em [RAILWAY.md](RAILWAY.md). O Dockerfile ativa o modo de produção; fora dele, `HOST` e `PORT` controlam o Waitress, com padrão local `127.0.0.1:5057`.
+Os arquivos para implantação no Railway e os passos de configuração estão em [RAILWAY.md](RAILWAY.md). O Dockerfile ativa o modo de produção; fora dele, `HOST` e `PORT` controlam o Waitress, com padrão local `127.0.0.1:5057`.
 
-Limites desta versão: um profissional e expediente fixo; sem redefinição automática de senha por e-mail; reservas pendentes não expiram automaticamente; alterações/cancelamentos de reservas confirmadas são tratados com a equipe; SQLite adequado à instância única. Não há automação de cobrança nem confirmação real de entrega do WhatsApp.
+Limites desta versão: um profissional e expediente fixo; sem redefinição automática de senha por e-mail; reservas pendentes não expiram automaticamente; SQLite adequado à instância única. Não há automação de cobrança nem confirmação real de entrega do WhatsApp.
 
 ## Fontes e decisões
 

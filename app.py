@@ -135,6 +135,32 @@ def whatsapp_ready():
     return all(current_app.config.get(key) for key in ("WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_TEMPLATE_NAME"))
 
 
+def cancellation_whatsapp_ready():
+    return bool(get_db().execute("SELECT whatsapp FROM settings WHERE id=1").fetchone()[0]) and all(current_app.config.get(key) for key in ("WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_CANCELLATION_TEMPLATE_NAME"))
+
+
+def send_cancellation_notice(booking):
+    """A provider acceptance is not evidence of delivery."""
+    if not cancellation_whatsapp_ready():
+        return "unconfigured"
+    cfg = current_app.config
+    phone = get_db().execute("SELECT whatsapp FROM settings WHERE id=1").fetchone()[0]
+    services = ', '.join(item['name'] for item in booking['services'])
+    day = '/'.join(reversed(booking['date'].split('-')))
+    details = f"Agendamento confirmado cancelado: {booking['name']}, {booking['phone']}, {day} às {booking['time']}, {services}."
+    text = ' '.join(details.split())
+    payload = {"messaging_product": "whatsapp", "to": phone, "type": "template", "template": {"name": cfg["WHATSAPP_CANCELLATION_TEMPLATE_NAME"], "language": {"code": "pt_BR"}, "components": [{"type": "body", "parameters": [{"type": "text", "text": text}]}]}}
+    endpoint = f"https://graph.facebook.com/{cfg['WHATSAPP_API_VERSION']}/{cfg['WHATSAPP_PHONE_NUMBER_ID']}/messages"
+    req = Request(endpoint, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "Authorization": f"Bearer {cfg['WHATSAPP_ACCESS_TOKEN']}"}, method="POST")
+    try:
+        with urlopen(req, timeout=8) as response:
+            result = json.load(response)
+        return "accepted" if result.get("messages", [{}])[0].get("id") else "failed"
+    except (URLError, TimeoutError, ValueError, KeyError, IndexError):
+        current_app.logger.warning("WhatsApp não aceitou o aviso de cancelamento.")
+        return "failed"
+
+
 def send_confirmation(booking):
     """Provider acceptance is not a delivery receipt. Manual fallback never claims sent."""
     if not whatsapp_ready():
@@ -170,7 +196,7 @@ def create_app(test_config=None):
         instance.mkdir(exist_ok=True)
         database = instance / 'kanella.sqlite3'
     app.config.from_mapping(DATABASE=str(database), SECRET_KEY=os.getenv('SECRET_KEY') or None, RAILWAY_PROXY=production, ADMIN_EMAIL=os.getenv("ADMIN_EMAIL", "ld3w1j@gmail.com").lower(), SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=production or os.getenv("COOKIE_SECURE") == "1", PERMANENT_SESSION_LIFETIME=timedelta(hours=12), MAX_CONTENT_LENGTH=16384, RATE_LIMIT_ENABLED=True)
-    for key in ("WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_TEMPLATE_NAME"):
+    for key in ("WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_TEMPLATE_NAME", "WHATSAPP_CANCELLATION_TEMPLATE_NAME"):
         app.config[key] = os.getenv(key, "")
     app.config["WHATSAPP_API_VERSION"] = os.getenv("WHATSAPP_API_VERSION", "v23.0")
     if test_config:
@@ -351,9 +377,23 @@ def create_app(test_config=None):
         return create_booking(data())
 
     @app.post("/api/bookings/cancel")
-    @transaction
     def bookings_cancel():
-        token = data().get("token")
+        booking, notify = cancel_booking(data())
+        if notify:
+            try:
+                status = send_cancellation_notice(booking)
+            except Exception:
+                app.logger.warning("Falha ao enviar aviso de cancelamento; reserva permanece cancelada.")
+                status = "failed"
+            try:
+                get_db().execute("UPDATE booking_cancellation_notifications SET status=? WHERE booking_id=?", (status, booking['id']))
+            except sqlite3.Error:
+                app.logger.warning("Não foi possível registrar o resultado do aviso de cancelamento.")
+        return jsonify(booking=booking)
+
+    @transaction
+    def cancel_booking(value):
+        token = value.get("token")
         if not isinstance(token, str) or not 1 <= len(token) <= 100:
             raise ValidationError("Link de reserva inválido.", 400)
         db = get_db()
@@ -361,12 +401,17 @@ def create_app(test_config=None):
         if not row:
             raise ValidationError("Reserva não encontrada.", 404)
         if row["status"] == "cancelled":
-            return jsonify(booking=booking_json(row))
-        if row["status"] != "pending":
-            raise ValidationError("Só é possível cancelar uma solicitação aguardando aprovação. Atualize o status da reserva.", 409)
+            return booking_json(row), False
+        if row["paid"]:
+            raise ValidationError("Para cancelar um agendamento com pagamento registrado, entre em contato com a barbearia.", 409)
+        if row["status"] not in ("pending", "confirmed"):
+            raise ValidationError("Este agendamento não pode mais ser cancelado. Atualize o status da reserva.", 409)
+        notify = row["status"] == "confirmed"
         db.execute("UPDATE bookings SET status='cancelled' WHERE id=?", (row["id"],))
         db.execute("DELETE FROM booking_slots WHERE booking_id=?", (row["id"],))
-        return jsonify(booking=booking_json(db.execute("SELECT * FROM bookings WHERE id=?", (row["id"],)).fetchone()))
+        if notify:
+            db.execute("INSERT INTO booking_cancellation_notifications(booking_id,status) VALUES(?,'pending')", (row["id"],))
+        return booking_json(db.execute("SELECT * FROM bookings WHERE id=?", (row["id"],)).fetchone()), notify
 
     @transaction
     def create_booking(value):
@@ -517,10 +562,13 @@ def create_app(test_config=None):
     def admin_get():
         db = get_db()
         bookings = [booking_json(r) for r in db.execute("SELECT * FROM bookings ORDER BY date DESC,time DESC")]
+        cancellation_notifications = dict(db.execute("SELECT booking_id,status FROM booking_cancellation_notifications"))
+        for booking in bookings:
+            booking['cancellationNotificationStatus'] = cancellation_notifications.get(booking['id'])
         orders = [order_json(r) for r in db.execute("SELECT o.*,u.name,u.phone FROM orders o JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC")]
         archived = [dict(row) for row in db.execute("SELECT 'service' AS kind,s.id,s.name FROM services s JOIN archived_catalog a ON a.kind='service' AND a.item_id=s.id UNION ALL SELECT 'product' AS kind,p.id,p.name FROM products p JOIN archived_catalog a ON a.kind='product' AND a.item_id=p.id")]
         pix = dict(db.execute('SELECT enabled,pix_key,name,city FROM pix_settings WHERE id=1').fetchone())
-        return jsonify(bookings=bookings,orders=orders,settings=dict(db.execute("SELECT * FROM settings WHERE id=1").fetchone()),pixSettings=pix,services=catalog("services"),products=catalog("products"),archived=archived,whatsappConfigured=whatsapp_ready(),stats={"pending":sum(b["status"]=="pending" for b in bookings),"confirmed":sum(b["status"]=="confirmed" for b in bookings),"revenue":sum(b["total"] for b in bookings if b["paid"])+sum(o["total"] for o in orders if o["status"]=="pickedup"),"customers":db.execute("SELECT COUNT(DISTINCT phone) FROM bookings WHERE status NOT IN ('rejected','cancelled')").fetchone()[0]})
+        return jsonify(bookings=bookings,orders=orders,settings=dict(db.execute("SELECT * FROM settings WHERE id=1").fetchone()),pixSettings=pix,services=catalog("services"),products=catalog("products"),archived=archived,whatsappConfigured=whatsapp_ready(),cancellationWhatsappConfigured=cancellation_whatsapp_ready(),stats={"pending":sum(b["status"]=="pending" for b in bookings),"confirmed":sum(b["status"]=="confirmed" for b in bookings),"revenue":sum(b["total"] for b in bookings if b["paid"])+sum(o["total"] for o in orders if o["status"]=="pickedup"),"customers":db.execute("SELECT COUNT(DISTINCT phone) FROM bookings WHERE status NOT IN ('rejected','cancelled')").fetchone()[0]})
 
     @app.post("/api/admin")
     @user_required(admin=True)
