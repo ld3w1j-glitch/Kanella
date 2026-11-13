@@ -208,6 +208,12 @@ def create_app(test_config=None):
             request.max_content_length = 3 * 1024 * 1024
         session.setdefault("csrf", secrets.token_urlsafe(32))
         g.user = get_db().execute("SELECT * FROM users WHERE id=?", (session.get("user_id"),)).fetchone() if session.get("user_id") else None
+        if g.user and g.user["is_admin"]:
+            password_version = hashlib.sha256(g.user["password_hash"].encode()).hexdigest()
+            if not secrets.compare_digest(session.get("admin_password_version", ""), password_version):
+                session.clear()
+                session["csrf"] = secrets.token_urlsafe(32)
+                g.user = None
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             origin = request.headers.get("Origin")
             if origin and origin != request.host_url.rstrip("/"):
@@ -290,7 +296,26 @@ def create_app(test_config=None):
             raise ValidationError("E-mail ou senha incorretos.", 401)
         session.clear()
         session.update(user_id=user["id"], csrf=secrets.token_urlsafe(32))
+        if user["is_admin"]:
+            session["admin_password_version"] = hashlib.sha256(user["password_hash"].encode()).hexdigest()
         session.permanent = True
+        return jsonify(ok=True)
+
+    @app.post("/api/admin/password")
+    @user_required(admin=True)
+    def admin_password():
+        limit("admin_password", 12, 900)
+        value = data()
+        current = value.get("currentPassword")
+        if not isinstance(current, str) or len(current) > 128 or not check_password_hash(g.user["password_hash"], current):
+            raise ValidationError("Senha atual incorreta.", 401)
+        new_password = valid_password(value.get("newPassword"))
+        password_hash = generate_password_hash(new_password)
+        updated = get_db().execute("UPDATE users SET password_hash=? WHERE id=? AND password_hash=?", (password_hash, g.user["id"], g.user["password_hash"]))
+        if updated.rowcount != 1:
+            raise ValidationError("A senha foi alterada em outra sessão. Entre novamente.", 409)
+        session["admin_password_version"] = hashlib.sha256(password_hash.encode()).hexdigest()
+        session["csrf"] = secrets.token_urlsafe(32)
         return jsonify(ok=True)
 
     @app.post("/api/logout")
