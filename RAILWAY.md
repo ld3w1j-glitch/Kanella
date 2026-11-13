@@ -28,7 +28,7 @@ python -m flask --app app create-admin
 
 Informe a senha duas vezes nos prompts, sem digitá-la na linha de comando ou registrá-la em arquivos. O e-mail é o de `ADMIN_EMAIL` ou o padrão já previsto. Esse comando também redefine a senha do administrador existente. No site, acesse **Gerenciador** no menu; uma conta comum não recebe privilégios administrativos.
 
-Depois, gere um domínio público nas configurações do Railway e valide o acesso HTTPS, o login, a criação de reserva e o fluxo da loja usando dados de teste. Confira se o endereço e o IP do cliente chegam corretamente ao serviço antes de depender da limitação de tentativas. O aplicativo usa `X-Forwarded-Proto` e `X-Real-IP` no modo de produção, pressupondo acesso pelo proxy do Railway; não exponha diretamente a porta do processo por outro caminho sem rever essa confiança.
+Depois, gere um domínio público nas configurações do Railway e valide o acesso HTTPS, o login, a criação de reserva e o fluxo da loja usando dados de teste. Em produção, o Waitress informa à aplicação o esquema HTTPS, pois o Railway termina a conexão TLS no proxy e o Waitress descarta cabeçalhos de proxy não confiáveis. Confira se o IP do cliente chega corretamente ao serviço antes de depender da limitação de tentativas; não exponha diretamente a porta do processo por outro caminho sem rever essa configuração.
 
 ## Dados atuais e recuperação
 
